@@ -4,9 +4,8 @@ use crate::models::{VersionDownloads, Versions};
 use crate::models::Latest;
 use crate::models::DownloadLink;
 use dirs::home_dir;
-use std::fs;
-use std::fs::File;
-use std::io::Write;
+use tokio::fs::{self, File};
+use tokio::io::AsyncWriteExt;
 use futures_util::stream::StreamExt;
 
 pub async fn get_latest_version() -> Result<Latest, Box<dyn Error>> {
@@ -51,22 +50,51 @@ pub async fn download_server_jar(file_url: String, version: &str) -> Result<(), 
     let mvm_dir = home_dir.join(".mvm/versions/").join(version);
 
     if !mvm_dir.exists() {
-        fs::create_dir_all(&mvm_dir)?;
+        fs::create_dir_all(&mvm_dir).await?;
     }
 
     let path = mvm_dir.join("server.jar");
 
     if response.status().is_success() {
-        let mut file = File::create(&path)?;
+        let mut file = File::create(&path).await?;
         let mut stream = response.bytes_stream();
 
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
-            file.write_all(&chunk)?;
+            file.write_all(&chunk).await?;
         }
 
         println!("File downloaded to {:?}", &path);
-
     }
+    Ok(())
+}
+
+pub async fn use_version(version: &str) -> Result<(), Box<dyn Error>> {
+    let home_dir = home_dir().ok_or("Could not find home directory")?;
+    let version_path = home_dir.join(".mvm").join("versions").join(version).join("server.jar");
+
+    if !version_path.exists() {
+        match get_version_download(version).await {
+            Ok(Some(download_info)) => {
+                println!("Found version, downloading...");
+                download_server_jar(download_info.url, version).await?;
+            }
+            Ok(None) => {
+                println!("Version not found!");
+                return Err("Version not found".into());
+            }
+            Err(err) => {
+                println!("Error: {}", err);
+                return Err(err);
+            }
+        }
+    }
+
+    let config_path = home_dir.join(".mvm").join("config.txt");
+
+    let mut file = File::create(&config_path).await?;
+    file.write_all(version.as_bytes()).await?;
+
+    println!("Now using version: {}", version);
     Ok(())
 }
