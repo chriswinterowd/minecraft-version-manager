@@ -1,0 +1,16 @@
+# Generated files
+/target/
+/**/*.rs.bk
+
+# Cargo-related files
+.cargo
+
+# IntelliJ IDEA files
+.idea/
+*.iml
+out/
+
+# Debug and log files
+*.log
+*.out
+

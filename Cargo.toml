@@ -1,0 +1,17 @@
+[package]
+name = "minecraft_version_manager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.21", features = ["derive"] }
+dirs = "5.0.1"
+reqwest = { version = "0.12.9", features = ["json", "stream"] }
+serde = { version="1.0.215", features=["derive"] }
+serde_json = "1.0.133"
+tokio = { version = "1.42.0", features=["full"] }
+futures-util = "0.3.31"
+
+[[bin]]
+name = "mvm"
+path = "src/main.rs"
