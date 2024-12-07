@@ -1,6 +1,5 @@
 mod version_manager;
 mod models;
-
 use clap::{Parser, Subcommand};
 use crate::version_manager::download_server_jar;
 
@@ -18,6 +17,10 @@ enum Commands {
         version: Option<String>,
     },
     Install {
+        #[arg(default_value = "latest")]
+        version: String
+    },
+    Which {
         #[arg(default_value = "latest")]
         version: String
     }
@@ -57,6 +60,16 @@ async fn main() {
             }
         }
 
+        Some(Commands::Which {version}) => {
+            match version_manager::get_version(&version).await {
+                Ok(path) => {
+                    println!("{}", path);
+                }
+                Err(err) => {
+                    println!("Error: {}", err);
+                }
+            }
+        }
         None => {
             println!("Unknown command: {:?}", cli.command);
         }

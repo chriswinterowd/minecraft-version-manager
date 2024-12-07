@@ -5,7 +5,7 @@ use crate::models::Latest;
 use crate::models::DownloadLink;
 use dirs::home_dir;
 use tokio::fs::{self, File};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use futures_util::stream::StreamExt;
 
 pub async fn get_latest_version() -> Result<Latest, Box<dyn Error>> {
@@ -40,6 +40,32 @@ pub async fn get_version_download(version_to_find: &str) -> Result<Option<Downlo
     }
 
     Ok(None)
+}
+
+pub async fn get_version(version: &str) -> Result<String, Box<dyn Error>> {
+    let home_dir = home_dir().ok_or("Could not find home directory")?;
+    let version_to_get = if version == "latest" {
+        let config_path = home_dir.join(".mvm").join("config.txt");
+        let mut file = File::open(config_path).await?;
+
+        let mut contents = String::new();
+
+        file.read_to_string(&mut contents).await?;
+        contents
+    } else {
+        version.to_string()
+    };
+
+    let version_path = home_dir.join(".mvm").join("versions").join(version_to_get).join("server.jar");
+
+    if !version_path.exists() {
+        return Err("Version not found".into());
+    }
+
+    let path_str = version_path.to_str().ok_or("Invalid path")?.to_string();
+
+    Ok(path_str)
+
 }
 
 pub async fn download_server_jar(file_url: String, version: &str) -> Result<(), Box<dyn Error>> {
@@ -80,7 +106,6 @@ pub async fn use_version(version: &str) -> Result<(), Box<dyn Error>> {
                 download_server_jar(download_info.url, version).await?;
             }
             Ok(None) => {
-                println!("Version not found!");
                 return Err("Version not found".into());
             }
             Err(err) => {
