@@ -2,6 +2,7 @@ mod version_manager;
 mod models;
 use clap::{Parser, Subcommand};
 use crate::version_manager::download_server_jar;
+use anyhow::{anyhow, Context, Result};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -27,52 +28,40 @@ enum Commands {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
         Some(Commands::r#Use {version}) => {
-            match version {
-                Some(version) => {
-                    if let Err(err) = version_manager::use_version(&version).await {
-                        println!("Error using version {}: {}", &version, err);
-                    }
-                }
-                None => {
-                    println!("No version provided, please specify a version.");
-                }
-            }
-
+            let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
+            version_manager::use_version(&version)
+                .await
+                .context(format!("Error using version '{}'", version))?;
         }
 
         Some(Commands::Install { version}) => {
-            match version_manager::get_version_download(&version).await {
-                Ok(Some(download_info)) =>  {
-                    println!("Found version, downloading..");
-                    if let Err(err) = download_server_jar(download_info.url, &version).await {
-                        println!("Error downloading server jar: {}", err);
-                    }
-                },
-                Ok(None) => println!("Version not found!"),
-                Err(err) => {
-                    println!("Error: {}", err);
-                }
-            }
+            let download_info = version_manager::get_version_download(&version)
+                .await?
+                .ok_or_else(|| anyhow!("Version: '{}' not found!;", version))?;
+
+            println!("Found version, downloading...");
+
+            download_server_jar(download_info.url, &version)
+                .await
+                .context("Error downloading server jar")?;
         }
 
         Some(Commands::Which {version}) => {
-            match version_manager::get_version(&version).await {
-                Ok(path) => {
-                    println!("{}", path);
-                }
-                Err(err) => {
-                    println!("Error: {}", err);
-                }
-            }
+            let path = version_manager::get_version(&version)
+                .await
+                .context(format!("Error getting version '{}'", version))?;
+            println!("{}", path);
         }
         None => {
             println!("Unknown command: {:?}", cli.command);
         }
     }
 
+
+    Ok(())
 }
