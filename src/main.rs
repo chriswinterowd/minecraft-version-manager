@@ -2,7 +2,7 @@ mod version_manager;
 mod models;
 use clap::{Parser, Subcommand};
 use crate::version_manager::download_server_jar;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -21,8 +21,11 @@ enum Commands {
         #[arg(default_value = "latest")]
         version: String
     },
+    Uninstall {
+        version: Option<String>,
+    },
     Which {
-        #[arg(default_value = "latest")]
+        #[arg(default_value = "recent")]
         version: String
     }
 }
@@ -35,26 +38,28 @@ async fn main() -> Result<()> {
         Some(Commands::r#Use {version}) => {
             let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
             version_manager::use_version(&version)
-                .await
-                .context(format!("Error using version '{}'", version))?;
+                .await?;
         }
 
         Some(Commands::Install { version}) => {
             let download_info = version_manager::get_version_download(&version)
-                .await?
-                .ok_or_else(|| anyhow!("Version: '{}' not found!;", version))?;
+                .await?;
 
             println!("Found version, downloading...");
 
             download_server_jar(download_info.url, &version)
-                .await
-                .context("Error downloading server jar")?;
+                .await?;
+        }
+
+        Some(Commands::Uninstall {version}) => {
+            let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
+
+            version_manager::delete_server_jar(&version).await?;
         }
 
         Some(Commands::Which {version}) => {
             let path = version_manager::get_version(&version)
-                .await
-                .context(format!("Error getting version '{}'", version))?;
+                .await?;
             println!("{}", path);
         }
         None => {
