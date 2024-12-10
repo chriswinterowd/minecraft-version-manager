@@ -5,7 +5,7 @@ mod config;
 use clap::{Parser, Subcommand};
 use crate::version_manager::download_server_jar;
 use anyhow::{anyhow, Result};
-use config::{initialize_home_dir, get_home_dir};
+use config::{set_dir, get_dir};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -36,13 +36,13 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    initialize_home_dir().await?;
+    set_dir(None).await?;
     let cli = Cli::parse();
 
     match cli.command {
         Some(Commands::r#Use {version}) => {
             let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
-            version_manager::use_version(&version, &get_home_dir().await?)
+            version_manager::use_version(&version, &get_dir().await?)
                 .await?;
         }
 
@@ -52,19 +52,19 @@ async fn main() -> Result<()> {
 
             println!("Found version, downloading...");
 
-            download_server_jar(download_info.url, &version, &get_home_dir().await?)
+            download_server_jar(download_info.url, &version, &get_dir().await?)
                 .await?;
         }
 
         Some(Commands::Uninstall {version}) => {
             let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
 
-            version_manager::delete_server_jar(&version, &get_home_dir().await?)
+            version_manager::delete_server_jar(&version, &get_dir().await?)
                 .await?;
         }
 
         Some(Commands::Which {version}) => {
-            let path = version_manager::get_version(&version, &get_home_dir().await?)
+            let path = version_manager::get_version(&version, &get_dir().await?)
                 .await?;
 
             println!("{}", path);
