@@ -36,7 +36,7 @@ pub async fn get_version_download(version_to_find: &str) -> Result<DownloadLink>
         .context("Failed to fetch the version manifest")?
         .json::<Versions>()
         .await
-        .context("Failed to parse the version manifest JSON")?;
+        .context("Failed to retrieve versions json")?;
 
     let find_version = versions_list.versions.into_iter().find(|version| version.id == version_id);
 
@@ -56,11 +56,8 @@ pub async fn get_version_download(version_to_find: &str) -> Result<DownloadLink>
     Err(anyhow!("Version {} not found!", &version_id))
 }
 
-pub async fn get_version(version: &str) -> Result<String> {
-    let home_dir = env::var("TEST_HOME_DIR")
-        .map(PathBuf::from)
-        .or_else(|_| home_dir().ok_or_else(|| anyhow!("Could not find home directory")))?;
-
+pub async fn get_version(version: &str, path: &PathBuf) -> Result<String> {
+    let home_dir = path;
     let version_to_get = if version == "recent" {
         let config_path = home_dir.join(".mvm").join("config.txt");
         let mut file = File::open(&config_path)
@@ -89,12 +86,12 @@ pub async fn get_version(version: &str) -> Result<String> {
 
 }
 
-pub async fn download_server_jar(file_url: String, version: &str) -> Result<()> {
+pub async fn download_server_jar(file_url: String, version: &str, path: &PathBuf) -> Result<()> {
     let response = reqwest::get(file_url)
         .await
         .context("Failed to send request to download server jar")?;
 
-    let home_dir = home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let home_dir = path;
 
     let mvm_dir = home_dir.join(".mvm/versions/").join(version);
 
@@ -124,8 +121,8 @@ pub async fn download_server_jar(file_url: String, version: &str) -> Result<()> 
     Ok(())
 }
 
-pub async fn delete_server_jar(version: &str) -> Result<()> {
-    let home_dir = home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+pub async fn delete_server_jar(version: &str, path: &PathBuf) -> Result<()> {
+    let home_dir = path;
 
     let version_dir = home_dir.join(".mvm/versions/").join(version);
 
@@ -142,15 +139,15 @@ pub async fn delete_server_jar(version: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn use_version(version: &str) -> Result<()> {
-    let home_dir = home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+pub async fn use_version(version: &str, path: &PathBuf) -> Result<()> {
+    let home_dir = path;
     let version_path = home_dir.join(".mvm").join("versions").join(version).join("server.jar");
 
     if !version_path.exists() {
         let download_info = get_version_download(version)
            .await?;
         println!("Found version, downloading...");
-        download_server_jar(download_info.url, version)
+        download_server_jar(download_info.url, version, &home_dir)
             .await
             .context("Failed to download server jar")?;
     }
@@ -237,17 +234,18 @@ mod tests {
         let test_home_dir = temp_dir.path();
 
         // Set TEST_HOME_DIR environment variable
-        std::env::set_var("TEST_HOME_DIR", test_home_dir);
+        std::env::set_var("HOME_DIR", test_home_dir);
 
         // Create .mvm/config.txt and write the version
         let config_path = test_home_dir.join(".mvm/config.txt");
+        eprintln!("Config path exists: {}", config_path.exists());
         tokio::fs::create_dir_all(config_path.parent().unwrap())
             .await
             .context("Failed to create config directory")?;
         tokio::fs::write(&config_path, "1.21")
             .await
             .context("Failed to write to config file")?;
-
+        eprintln!("Config path exists: {}", config_path.exists());
         // Create the version directory and server.jar file
         let version_dir = test_home_dir.join(".mvm/versions/1.21");
         tokio::fs::create_dir_all(&version_dir)
