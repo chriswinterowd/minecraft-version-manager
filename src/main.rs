@@ -4,8 +4,9 @@ mod config;
 
 use clap::{Parser, Subcommand};
 use crate::version_manager::download_server_jar;
+use crate::models::ServerType;
 use anyhow::{anyhow, Result};
-use config::{set_dir, get_dir};
+use config::{get_dir};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -16,13 +17,20 @@ struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
+#[command(group(
+    ArgGroup::new("server_type")
+        .args(&["paper"]),
+))]
 enum Commands {
     r#Use {
         version: Option<String>,
     },
     Install {
         #[arg(default_value = "latest")]
-        version: String
+        version: String,
+
+        #[arg(long)]
+        paper: bool
     },
     Uninstall {
         version: Option<String>,
@@ -36,7 +44,6 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    set_dir(None).await?;
     let cli = Cli::parse();
 
     match cli.command {
@@ -46,8 +53,10 @@ async fn main() -> Result<()> {
                 .await?;
         }
 
-        Some(Commands::Install { version}) => {
-            let download_info = version_manager::get_version_download(&version)
+        Some(Commands::Install { version, paper}) => {
+            let server_type = ServerType::determine_server_type(paper);
+
+            let download_info = version_manager::get_version_download(&version, &server_type)
                 .await?;
 
             println!("Found version, downloading...");

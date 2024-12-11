@@ -1,5 +1,5 @@
-use crate::config::{get_dir, set_dir};
-use crate::models::DownloadLink;
+use crate::config::{get_dir};
+use crate::models::{DownloadLink, ServerType};
 use crate::models::Latest;
 use crate::models::{VersionDownloads, Versions};
 use anyhow::{anyhow, Context, Result};
@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub async fn get_latest_version() -> Result<Latest> {
+pub async fn get_latest_vanilla_version() -> Result<Latest> {
     let response = reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
         .await
         .context("Error fetching the latest version")?
@@ -19,9 +19,20 @@ pub async fn get_latest_version() -> Result<Latest> {
     Ok(response.latest)
 }
 
-pub async fn get_version_download(version_to_find: &str) -> Result<DownloadLink> {
+pub async fn get_version_download(version_to_find: &str, server_type: &ServerType) -> Result<DownloadLink> {
+    match server_type {
+        ServerType::Vanilla => get_vanilla_download_url(&version_to_find).await,
+
+        ServerType::Paper => get_paper_download_url(&version_to_find).await,
+
+        None => Err(anyhow!("Server type not found!"))
+    }
+
+}
+
+pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<DownloadLink> {
     let version_id = if version_to_find == "latest" {
-        let latest_version = get_latest_version()
+        let latest_version = get_latest_vanilla_version()
             .await
             .context("Failed to get the latest version")?;
         latest_version.release
@@ -57,7 +68,7 @@ pub async fn get_version_download(version_to_find: &str) -> Result<DownloadLink>
 pub async fn get_version(version: &str, path: &PathBuf) -> Result<String> {
     let mvm_dir = path;
     let version_to_get = if version == "recent" {
-        let config_path = mvm_dir.join(".mvm").join("config.txt");
+        let config_path = mvm_dir.join("config.txt");
         let mut file = File::open(&config_path)
             .await
             .context(format!("Failed to open config file at{:?}", &config_path))?;
@@ -72,7 +83,7 @@ pub async fn get_version(version: &str, path: &PathBuf) -> Result<String> {
         version.to_string()
     };
 
-    let version_path = mvm_dir.join(".mvm").join("versions").join(&version_to_get).join("server.jar");
+    let version_path = mvm_dir.join("versions").join(&version_to_get).join("server.jar");
 
     if !version_path.exists() {
         return Err(anyhow!("Version '{}' not found", &version_to_get));
@@ -90,12 +101,12 @@ pub async fn download_server_jar(file_url: String, version: &str, path: &PathBuf
         .context("Failed to send request to download server jar")?;
 
     let mvm_dir = path;
-    let version_dir = mvm_dir.join(".mvm/versions/").join(version);
+    let version_dir = mvm_dir.join("versions").join(version);
 
     if !version_dir.exists() {
         fs::create_dir_all(&version_dir)
             .await
-            .context("Failed to create directory for the version")?;
+            .context(format!("Failed to create directory for the version, path: {:?}", &version_dir))?;
     }
 
     let server_jar_path = version_dir.join("server.jar");
@@ -121,7 +132,7 @@ pub async fn download_server_jar(file_url: String, version: &str, path: &PathBuf
 pub async fn delete_server_jar(version: &str, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
 
-    let version_dir = mvm_dir.join(".mvm/versions/").join(version);
+    let version_dir = mvm_dir.join("versions").join(version);
 
     if !version_dir.exists() {
         return Err(anyhow!("Version not found"));
@@ -138,7 +149,7 @@ pub async fn delete_server_jar(version: &str, path: &PathBuf) -> Result<()> {
 
 pub async fn use_version(version: &str, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
-    let server_jar_path = mvm_dir.join(".mvm").join("versions").join(version).join("server.jar");
+    let server_jar_path = mvm_dir.join("versions").join(version).join("server.jar");
 
     if !server_jar_path.exists() {
         let download_info = get_version_download(version)
@@ -149,7 +160,7 @@ pub async fn use_version(version: &str, path: &PathBuf) -> Result<()> {
             .context("Failed to download server jar")?;
     }
 
-    let config_path = mvm_dir.join(".mvm").join("config.txt");
+    let config_path = mvm_dir.join("config.txt");
 
     let mut file = File::create(&config_path)
         .await
@@ -165,6 +176,7 @@ pub async fn use_version(version: &str, path: &PathBuf) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use super::*;
 
     #[tokio::test]
@@ -193,9 +205,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_version() -> Result<()> {
-        let test_home_dir= PathBuf::from("./test_data");
+        let test_home_dir= PathBuf::from("./test_data/.mvm");
 
-        set_dir(Some(&test_home_dir)).await?;
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let result = get_version("1.21", &get_dir().await?).await;
 
@@ -210,9 +222,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_version_recent() -> Result<()> {
-        let test_home_dir = PathBuf::from("./test_data");
+        let test_home_dir = PathBuf::from("./test_data/.mvm");
 
-        set_dir(Some(&test_home_dir)).await?;
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let result = get_version("recent", &get_dir().await?).await;
 
@@ -227,9 +239,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_version_nonexistent_version() -> Result<()> {
-        let test_home_dir= PathBuf::from("./test_data");
+        let test_home_dir= PathBuf::from("./test_data/.mvm");
 
-        set_dir(Some(&test_home_dir)).await?;
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let version = "nonexistent version";
         let result = get_version(version, &get_dir().await?).await;
@@ -245,9 +257,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_download_server_jar() -> Result<()> {
-        let test_home_dir = PathBuf::from("./test_data");
+        let test_home_dir = PathBuf::from("./test_data/.mvm");
 
-        set_dir(Some(&test_home_dir)).await?;
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let version = "1.20.2";
         let download_info = get_version_download(&version).await?;
@@ -260,13 +272,13 @@ mod tests {
 
         assert!(result.is_ok(), "Failed to download server jar!");
 
-        let downloaded_file = test_home_dir.join(".mvm/versions/1.20.2/server.jar");
+        let downloaded_file = test_home_dir.join("versions/1.20.2/server.jar");
         assert!(
             downloaded_file.exists(),
             "Server jar was not downloaded to the expected location!"
         );
 
-        tokio::fs::remove_dir_all(test_home_dir.join(".mvm/versions/1.20.2"))
+        tokio::fs::remove_dir_all(test_home_dir.join("versions/1.20.2"))
             .await?;
 
         Ok(())
@@ -274,8 +286,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_server_jar() -> Result<()> {
-        let test_home_dir = PathBuf::from("./test_data");
-        set_dir(Some(&test_home_dir)).await?;
+        let test_home_dir = PathBuf::from("./test_data/.mvm");
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let test_dir = PathBuf::from("./test_data/.mvm/versions/1.17");
         let test_file = test_dir.join("server.jar");
@@ -301,9 +313,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_server_jar_nonexistent_version() -> Result<()> {
-        let test_home_dir = PathBuf::from("./test_data");
+        let test_home_dir = PathBuf::from("./test_data/.mvm");
 
-        set_dir(Some(&test_home_dir)).await?;
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let version = "nonexistent version";
 
@@ -320,9 +332,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_use_version() -> Result<()> {
-        let test_home_dir = PathBuf::from("./test_data");
+        let test_home_dir = PathBuf::from("./test_data/.mvm");
 
-        set_dir(Some(&test_home_dir)).await?;
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let test_dir = PathBuf::from("./test_data/.mvm/versions/1.17");
         let test_file = test_dir.join("server.jar");
@@ -341,7 +353,7 @@ mod tests {
 
         tokio::fs::remove_dir_all(test_dir).await?;
 
-        let config_path = test_home_dir.join(".mvm").join("config.txt");
+        let config_path = test_home_dir.join("config.txt");
         let contents = tokio::fs::read_to_string(&config_path)
             .await
             .expect("Failed to read config.txt");
@@ -361,9 +373,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_use_version_nonexistent_version() -> Result<()> {
-        let test_home_dir = PathBuf::from("./test_data");
+        let test_home_dir = PathBuf::from("./test_data/.mvm");
 
-        set_dir(Some(&test_home_dir)).await?;
+        env::set_var("MVM_HOME", &test_home_dir);
 
         let version = "nonexistent version";
 
