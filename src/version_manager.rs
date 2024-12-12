@@ -1,7 +1,7 @@
 use crate::config::{get_dir};
-use crate::models::{DownloadLink, ServerType};
-use crate::models::Latest;
-use crate::models::{VersionDownloads, Versions};
+use crate::server::vanilla::{VanillaDownloadLink, Latest, VersionDownloads, VanillaVersions};
+use crate::server::paper::{PaperVersions, PaperVersion, PaperVersionBuilds, PaperDownloadLink};
+use crate::server::server_types::ServerType;
 use anyhow::{anyhow, Context, Result};
 use futures_util::stream::StreamExt;
 use reqwest;
@@ -9,28 +9,26 @@ use std::path::PathBuf;
 use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+
+pub async fn get_version_download(version_to_find: &str, server_type: &ServerType) -> Result<String> {
+    match server_type {
+        ServerType::Vanilla => get_vanilla_download_url(&version_to_find).await,
+        ServerType::Paper => get_paper_download_url(&version_to_find).await,
+        None => Err(anyhow!("Server type not found!"))
+    }
+}
+
 pub async fn get_latest_vanilla_version() -> Result<Latest> {
     let response = reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
         .await
-        .context("Error fetching the latest version")?
-        .json::<Versions>()
+        .context("Error fetching the latest vanilla version")?
+        .json::<VanillaVersions>()
         .await
-        .context("Failed to parse the latest version JSON")?;
+        .context("Failed to parse the latest vanilla version JSON")?;
     Ok(response.latest)
 }
 
-pub async fn get_version_download(version_to_find: &str, server_type: &ServerType) -> Result<DownloadLink> {
-    match server_type {
-        ServerType::Vanilla => get_vanilla_download_url(&version_to_find).await,
-
-        ServerType::Paper => get_paper_download_url(&version_to_find).await,
-
-        None => Err(anyhow!("Server type not found!"))
-    }
-
-}
-
-pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<DownloadLink> {
+pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<VanillaDownloadLink> {
     let version_id = if version_to_find == "latest" {
         let latest_version = get_latest_vanilla_version()
             .await
@@ -43,7 +41,7 @@ pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<DownloadL
     let versions_list = reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
         .await
         .context("Failed to fetch the version manifest")?
-        .json::<Versions>()
+        .json::<VanillaVersions>()
         .await
         .context("Failed to retrieve versions json")?;
 
@@ -57,12 +55,55 @@ pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<DownloadL
             .await
             .context("Failed to parse version details JSON")?;
 
-        let download_url = version_info.downloads.server;
+        let download_url = version_info.downloads.server.url;
 
         return Ok(download_url)
     }
 
     Err(anyhow!("Version {} not found!", &version_id))
+}
+
+pub async fn get_latest_paper_version() -> Result<PaperVersion> {
+    let response = reqwest::get("https://api.papermc.io/v2/projects/paper")
+        .await
+        .context("Error fetching the latest paper version")?
+        .json::<PaperVersions>()
+        .await
+        .context("Failed to parse the latest paper version JSON")?;
+
+    if let Some(latest) = response.last() {
+        Ok(latest)
+    } else {
+        Err(anyhow!("Failed to retrieve the latest paper version from array."))
+    }
+
+}
+
+pub async fn get_paper_download_url(version_to_find: &str) -> Result<PaperDownloadLink> {
+    let version_id = if version_to_find == "latest" {
+        let latest_version = get_latest_paper_version()
+            .await?;
+        latest_version
+    } else {
+        version_to_find.to_string()
+    };
+
+    let build = reqwest::get(format!("https://api.papermc.io/v2/projects/paper/versions/{}", version_id))
+        .await
+        .context("Version not found!")?
+        .json::<PaperVersionBuilds>()
+        .await
+        .context("Failed to parse the paper version builds JSON")?;
+
+    if let Some(latest_build) = build.last() {
+        let jar_name = format!("paper-{}-{}.jar", version_id, latest_build);
+        let download_url = format!("https:://api.papermc.io/v2/projects/paper/versions{}/builds/{}/downloads/{}", version_id, latest_build, jar_name);
+        Ok(download_url)
+    } else {
+        Err(anyhow!(format!("Failed to reteive the latest build for paper version {}", version_id)))
+    }
+
+
 }
 
 pub async fn get_version(version: &str, path: &PathBuf) -> Result<String> {

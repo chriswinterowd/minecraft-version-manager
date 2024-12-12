@@ -1,10 +1,10 @@
 mod version_manager;
-mod models;
 mod config;
+mod server;
 
 use clap::{Parser, Subcommand};
 use crate::version_manager::download_server_jar;
-use crate::models::ServerType;
+use crate::server::server_types::ServerType;
 use anyhow::{anyhow, Result};
 use config::{get_dir};
 
@@ -56,12 +56,12 @@ async fn main() -> Result<()> {
         Some(Commands::Install { version, paper}) => {
             let server_type = ServerType::determine_server_type(paper);
 
-            let download_info = version_manager::get_version_download(&version, &server_type)
+            let download_url = version_manager::get_version_download(&version, &server_type)
                 .await?;
 
             println!("Found version, downloading...");
 
-            download_server_jar(download_info.url, &version, &get_dir().await?)
+            download_server_jar(download_url, &version, &get_dir().await?)
                 .await?;
         }
 
