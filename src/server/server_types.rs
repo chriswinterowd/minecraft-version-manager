@@ -12,4 +12,11 @@ impl ServerType {
             ServerType::Vanilla
         }
     }
+
+    pub fn get_server_path(&self) -> String {
+        match self {
+            ServerType::Vanilla => String::from("vanilla"),
+            ServerType::Paper => String::from("paper")
+        }
+    }
 }

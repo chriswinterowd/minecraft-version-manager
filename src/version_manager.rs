@@ -1,20 +1,20 @@
-use crate::config::{get_dir};
+use crate::config::get_dir;
 use crate::server::vanilla::{VanillaDownloadLink, Latest, VersionDownloads, VanillaVersions};
 use crate::server::paper::{PaperVersions, PaperVersion, PaperVersionBuilds, PaperDownloadLink};
 use crate::server::server_types::ServerType;
+use crate::server::toml_config::VersionConfig;
 use anyhow::{anyhow, Context, Result};
 use futures_util::stream::StreamExt;
 use reqwest;
 use std::path::PathBuf;
 use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
+use toml;
 
 pub async fn get_version_download(version_to_find: &str, server_type: &ServerType) -> Result<String> {
     match server_type {
         ServerType::Vanilla => get_vanilla_download_url(&version_to_find).await,
         ServerType::Paper => get_paper_download_url(&version_to_find).await,
-        None => Err(anyhow!("Server type not found!"))
     }
 }
 
@@ -64,14 +64,14 @@ pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<VanillaDo
 }
 
 pub async fn get_latest_paper_version() -> Result<PaperVersion> {
-    let response = reqwest::get("https://api.papermc.io/v2/projects/paper")
+    let mut response = reqwest::get("https://api.papermc.io/v2/projects/paper")
         .await
         .context("Error fetching the latest paper version")?
         .json::<PaperVersions>()
         .await
         .context("Failed to parse the latest paper version JSON")?;
 
-    if let Some(latest) = response.last() {
+    if let Some(latest) = response.versions.pop() {
         Ok(latest)
     } else {
         Err(anyhow!("Failed to retrieve the latest paper version from array."))
@@ -88,16 +88,16 @@ pub async fn get_paper_download_url(version_to_find: &str) -> Result<PaperDownlo
         version_to_find.to_string()
     };
 
-    let build = reqwest::get(format!("https://api.papermc.io/v2/projects/paper/versions/{}", version_id))
+    let response = reqwest::get(format!("https://api.papermc.io/v2/projects/paper/versions/{}", version_id))
         .await
         .context("Version not found!")?
         .json::<PaperVersionBuilds>()
         .await
         .context("Failed to parse the paper version builds JSON")?;
 
-    if let Some(latest_build) = build.last() {
+    if let Some(latest_build) = response.builds.last() {
         let jar_name = format!("paper-{}-{}.jar", version_id, latest_build);
-        let download_url = format!("https:://api.papermc.io/v2/projects/paper/versions{}/builds/{}/downloads/{}", version_id, latest_build, jar_name);
+        let download_url = format!("https://api.papermc.io/v2/projects/paper/versions/{}/builds/{}/downloads/{}", version_id, latest_build, jar_name);
         Ok(download_url)
     } else {
         Err(anyhow!(format!("Failed to reteive the latest build for paper version {}", version_id)))
@@ -106,25 +106,29 @@ pub async fn get_paper_download_url(version_to_find: &str) -> Result<PaperDownlo
 
 }
 
-pub async fn get_version(version: &str, path: &PathBuf) -> Result<String> {
+pub async fn get_version(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<String> {
     let mvm_dir = path;
+    let config_path = mvm_dir.join("config.toml");
+    if !config_path.exists() {
+        return Err(anyhow!(format!("No version has been set! path: {:?}", config_path)));
+    }
+
     let version_to_get = if version == "recent" {
-        let config_path = mvm_dir.join("config.txt");
-        let mut file = File::open(&config_path)
+        let toml_content = fs::read_to_string(config_path)
             .await
-            .context(format!("Failed to open config file at{:?}", &config_path))?;
-
-        let mut contents = String::new();
-
-        file.read_to_string(&mut contents)
-            .await
-            .context("Failed to read contents of config file")?;
-        contents
+            .context("Failed to read config.toml")?;
+        let version_config = toml::from_str::<VersionConfig>(&toml_content)
+            .context("Failed to deserialize version config")?;
+        match server_type {
+            ServerType::Vanilla => version_config.vanilla,
+            ServerType::Paper => version_config.paper
+        }
     } else {
         version.to_string()
     };
 
-    let version_path = mvm_dir.join("versions").join(&version_to_get).join("server.jar");
+    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let version_path = server_type_dir.join("versions").join(&version_to_get).join("server.jar");
 
     if !version_path.exists() {
         return Err(anyhow!("Version '{}' not found", &version_to_get));
@@ -136,13 +140,15 @@ pub async fn get_version(version: &str, path: &PathBuf) -> Result<String> {
 
 }
 
-pub async fn download_server_jar(file_url: String, version: &str, path: &PathBuf) -> Result<()> {
-    let response = reqwest::get(file_url)
+pub async fn download_server_jar(file_url: String, version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
+    let response = reqwest::get(&file_url)
         .await
-        .context("Failed to send request to download server jar")?;
+        .context(format!("Failed to send request to download server jar! Download link: {}", &file_url))?;
 
     let mvm_dir = path;
-    let version_dir = mvm_dir.join("versions").join(version);
+
+    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let version_dir = server_type_dir.join("versions").join(version);
 
     if !version_dir.exists() {
         fs::create_dir_all(&version_dir)
@@ -170,10 +176,10 @@ pub async fn download_server_jar(file_url: String, version: &str, path: &PathBuf
     Ok(())
 }
 
-pub async fn delete_server_jar(version: &str, path: &PathBuf) -> Result<()> {
+pub async fn delete_server_jar(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
-
-    let version_dir = mvm_dir.join("versions").join(version);
+    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let version_dir = server_type_dir.join("versions").join(version);
 
     if !version_dir.exists() {
         return Err(anyhow!("Version not found"));
@@ -188,27 +194,47 @@ pub async fn delete_server_jar(version: &str, path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub async fn use_version(version: &str, path: &PathBuf) -> Result<()> {
+pub async fn use_version(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
-    let server_jar_path = mvm_dir.join("versions").join(version).join("server.jar");
+    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let version_dir = server_type_dir.join("versions").join(version);
+    let server_jar_path = version_dir.join("server.jar");
 
     if !server_jar_path.exists() {
-        let download_info = get_version_download(version)
+        let download_info = get_version_download(version, server_type)
            .await?;
         println!("Found version, downloading...");
-        download_server_jar(download_info.url, version, &mvm_dir)
+        download_server_jar(download_info, version, server_type, &mvm_dir)
             .await
             .context("Failed to download server jar")?;
     }
 
-    let config_path = mvm_dir.join("config.txt");
+    let config_path = mvm_dir.join("config.toml");
 
-    let mut file = File::create(&config_path)
+    let mut versions = if config_path.exists() {
+        let toml_content = fs::read_to_string(&config_path)
+            .await
+            .context("Failed to read config.toml")?;
+        toml::from_str::<VersionConfig>(&toml_content)
+            .context("Failed to deserialize version config")?
+    } else {
+        VersionConfig {
+            vanilla: "".to_string(),
+            paper: "".to_string()
+        }
+    };
+
+    match server_type {
+        ServerType::Vanilla => versions.vanilla = version.to_string(),
+        ServerType::Paper => versions.paper = version.to_string()
+    }
+
+    let toml_string = toml::to_string_pretty(&versions)
+        .context("Failed to serialize version config")?;
+
+    fs::write(&config_path, toml_string)
         .await
-        .context("Failed to create config.txt file")?;
-    file.write_all(version.as_bytes())
-        .await
-        .context("Failed to write to config.txt")?;
+        .context("Failed to write to config.toml file")?;
 
     println!("Now using version: {}", version);
     Ok(())

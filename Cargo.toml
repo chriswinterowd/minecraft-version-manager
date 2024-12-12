@@ -13,6 +13,8 @@ tokio = { version = "1.42.0", features=["full"] }
 futures-util = "0.3.31"
 anyhow = "1.0.94"
 tempfile = "3.14.0"
+toml = "0.8.19"
+url = "2.5.4"
 
 [[bin]]
 name = "mvm"

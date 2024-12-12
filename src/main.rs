@@ -17,13 +17,12 @@ struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
-#[command(group(
-    ArgGroup::new("server_type")
-        .args(&["paper"]),
-))]
 enum Commands {
     r#Use {
         version: Option<String>,
+
+        #[arg(long)]
+        paper: bool
     },
     Install {
         #[arg(default_value = "latest")]
@@ -34,10 +33,16 @@ enum Commands {
     },
     Uninstall {
         version: Option<String>,
+
+        #[arg(long)]
+        paper: bool
     },
     Which {
         #[arg(default_value = "recent")]
-        version: String
+        version: String,
+
+        #[arg(long)]
+        paper: bool
     }
 }
 
@@ -47,9 +52,10 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::r#Use {version}) => {
+        Some(Commands::r#Use {version, paper}) => {
+            let server_type = ServerType::determine_server_type(paper);
             let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
-            version_manager::use_version(&version, &get_dir().await?)
+            version_manager::use_version(&version, &server_type, &get_dir().await?)
                 .await?;
         }
 
@@ -61,19 +67,20 @@ async fn main() -> Result<()> {
 
             println!("Found version, downloading...");
 
-            download_server_jar(download_url, &version, &get_dir().await?)
+            download_server_jar(download_url, &version, &server_type,&get_dir().await?)
                 .await?;
         }
 
-        Some(Commands::Uninstall {version}) => {
+        Some(Commands::Uninstall {version, paper}) => {
             let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
-
-            version_manager::delete_server_jar(&version, &get_dir().await?)
+            let server_type = ServerType::determine_server_type(paper);
+            version_manager::delete_server_jar(&version, &server_type, &get_dir().await?)
                 .await?;
         }
 
-        Some(Commands::Which {version}) => {
-            let path = version_manager::get_version(&version, &get_dir().await?)
+        Some(Commands::Which {version, paper}) => {
+            let server_type = ServerType::determine_server_type(paper);
+            let path = version_manager::get_version(&version, &server_type, &get_dir().await?)
                 .await?;
 
             println!("{}", path);
