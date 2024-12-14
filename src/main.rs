@@ -12,6 +12,8 @@ use config::{get_dir};
 #[command(version, about, long_about = None)]
 
 struct Cli {
+    #[arg(long, global = true)]
+    paper: bool,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -53,14 +55,16 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Some(Commands::r#Use {version, paper}) => {
-            let server_type = ServerType::determine_server_type(paper);
+            let server_type_string = bool_to_string(paper);
+            let server_type = ServerType::from_string(server_type_string)?;
             let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
             version_manager::use_version(&version, &server_type, &get_dir().await?)
                 .await?;
         }
 
         Some(Commands::Install { version, paper}) => {
-            let server_type = ServerType::determine_server_type(paper);
+            let server_type_string = bool_to_string(paper);
+            let server_type = ServerType::from_string(server_type_string)?;
 
             let download_url = version_manager::get_version_download(&version, &server_type)
                 .await?;
@@ -73,13 +77,15 @@ async fn main() -> Result<()> {
 
         Some(Commands::Uninstall {version, paper}) => {
             let version = version.ok_or_else(|| anyhow!("No version provided, please specify a version."))?;
-            let server_type = ServerType::determine_server_type(paper);
+            let server_type_string = bool_to_string(paper);
+            let server_type = ServerType::from_string(server_type_string)?;
             version_manager::delete_server_jar(&version, &server_type, &get_dir().await?)
                 .await?;
         }
 
         Some(Commands::Which {version, paper}) => {
-            let server_type = ServerType::determine_server_type(paper);
+            let server_type_string = bool_to_string(paper);
+            let server_type = ServerType::from_string(server_type_string)?;
             let path = version_manager::get_version(&version, &server_type, &get_dir().await?)
                 .await?;
 
@@ -92,4 +98,11 @@ async fn main() -> Result<()> {
 
 
     Ok(())
+}
+
+fn bool_to_string(paper: bool) -> String {
+    match paper {
+        true => "paper".to_string(),
+        false => "vanilla".to_string()
+    }
 }

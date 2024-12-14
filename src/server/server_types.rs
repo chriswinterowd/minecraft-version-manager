@@ -1,3 +1,6 @@
+use std::fmt::Display;
+use anyhow::{anyhow, Result};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ServerType {
     Vanilla,
@@ -5,18 +8,21 @@ pub enum ServerType {
 }
 
 impl ServerType {
-    pub fn determine_server_type(paper: bool) -> Self {
-        if paper {
-            ServerType::Paper
-        } else {
-            ServerType::Vanilla
+    pub fn from_string(server_type_string: String) -> Result<Self> {
+        match server_type_string.as_str() {
+            "paper" => Ok(ServerType::Paper),
+            "vanilla" => Ok(ServerType::Vanilla),
+            _ => Err(anyhow!("Invalid server type: {}", server_type_string)),
         }
     }
+}
 
-    pub fn get_server_path(&self) -> String {
-        match self {
-            ServerType::Vanilla => String::from("vanilla"),
-            ServerType::Paper => String::from("paper")
-        }
+impl Display for ServerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            ServerType::Vanilla => "vanilla".to_string(),
+            ServerType::Paper => "paper".to_string()
+        };
+        write!(f, "{}", str)
     }
 }

@@ -1,4 +1,3 @@
-use crate::config::get_dir;
 use crate::server::vanilla::{VanillaDownloadLink, Latest, VersionDownloads, VanillaVersions};
 use crate::server::paper::{PaperVersions, PaperVersion, PaperVersionBuilds, PaperDownloadLink};
 use crate::server::server_types::ServerType;
@@ -8,7 +7,7 @@ use futures_util::stream::StreamExt;
 use reqwest;
 use std::path::PathBuf;
 use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use toml;
 
 pub async fn get_version_download(version_to_find: &str, server_type: &ServerType) -> Result<String> {
@@ -127,7 +126,7 @@ pub async fn get_version(version: &str, server_type: &ServerType, path: &PathBuf
         version.to_string()
     };
 
-    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let server_type_dir = mvm_dir.join(server_type.to_string());
     let version_path = server_type_dir.join("versions").join(&version_to_get).join("server.jar");
 
     if !version_path.exists() {
@@ -147,7 +146,7 @@ pub async fn download_server_jar(file_url: String, version: &str, server_type: &
 
     let mvm_dir = path;
 
-    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let server_type_dir = mvm_dir.join(server_type.to_string());
     let version_dir = server_type_dir.join("versions").join(version);
 
     if !version_dir.exists() {
@@ -178,7 +177,7 @@ pub async fn download_server_jar(file_url: String, version: &str, server_type: &
 
 pub async fn delete_server_jar(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
-    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let server_type_dir = mvm_dir.join(server_type.to_string());
     let version_dir = server_type_dir.join("versions").join(version);
 
     if !version_dir.exists() {
@@ -196,7 +195,7 @@ pub async fn delete_server_jar(version: &str, server_type: &ServerType, path: &P
 
 pub async fn use_version(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
-    let server_type_dir = mvm_dir.join(server_type.get_server_path());
+    let server_type_dir = mvm_dir.join(server_type.to_string());
     let version_dir = server_type_dir.join("versions").join(version);
     let server_jar_path = version_dir.join("server.jar");
 
