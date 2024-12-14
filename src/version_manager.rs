@@ -1,3 +1,6 @@
+//! This module handles version management for Minecraft servers.
+//! It provides utilities for retrieving and processing server versions.
+
 use crate::server::vanilla::{VanillaDownloadLink, Latest, VersionDownloads, VanillaVersions};
 use crate::server::paper::{PaperVersions, PaperVersion, PaperVersionBuilds, PaperDownloadLink};
 use crate::server::server_types::ServerType;
@@ -10,6 +13,14 @@ use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 use toml;
 
+/// Fetches the download link for a specified version of the given type of minecraft server
+///
+/// # Arguments
+/// - `version_to_find`: A reference to the version string to fetch the download link
+/// - `server_type`: The type of server for the requested download link
+///
+/// # Returns
+/// A `Result` containing the download link as a String if successful
 pub async fn get_version_download(version_to_find: &str, server_type: &ServerType) -> Result<String> {
     match server_type {
         ServerType::Vanilla => get_vanilla_download_url(&version_to_find).await,
@@ -17,6 +28,10 @@ pub async fn get_version_download(version_to_find: &str, server_type: &ServerTyp
     }
 }
 
+/// Returns a Result containing the latest vanilla server version as a String if successful
+///
+/// # Returns
+/// A `Result` containing the vanilla Minecraft version as a String if successful
 pub async fn get_latest_vanilla_version() -> Result<Latest> {
     let response = reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest.json")
         .await
@@ -27,6 +42,15 @@ pub async fn get_latest_vanilla_version() -> Result<Latest> {
     Ok(response.latest)
 }
 
+/// Fetches the download link for a specific vanilla Minecraft server given the version
+///
+/// If the version to find is "latest", it retrieves the most recent version automatically
+///
+///# Arguments
+/// - `version_to_find`: A reference to the version string to fetch the download link
+///
+/// # Returns
+/// A `Result` containing the download link for the vanilla Minecraft server version as a String if successful
 pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<VanillaDownloadLink> {
     let version_id = if version_to_find == "latest" {
         let latest_version = get_latest_vanilla_version()
@@ -62,6 +86,8 @@ pub async fn get_vanilla_download_url(version_to_find: &str) -> Result<VanillaDo
     Err(anyhow!("Version {} not found!", &version_id))
 }
 
+
+/// Returns a Result containing the latest Paper server version as a String if successful
 pub async fn get_latest_paper_version() -> Result<PaperVersion> {
     let mut response = reqwest::get("https://api.papermc.io/v2/projects/paper")
         .await
@@ -78,6 +104,14 @@ pub async fn get_latest_paper_version() -> Result<PaperVersion> {
 
 }
 
+/// Fetches the download link for a specific Paper Minecraft server given the version
+/// If the version to find is "latest", it retrieves the most recent version automatically
+///
+/// # Arguments
+/// - `version_to_find`: A reference to the version string to fetch the download link
+///
+/// # Returns
+/// A `Result` containing the download link for the vanilla Minecraft server version as a String if successful
 pub async fn get_paper_download_url(version_to_find: &str) -> Result<PaperDownloadLink> {
     let version_id = if version_to_find == "latest" {
         let latest_version = get_latest_paper_version()
@@ -105,14 +139,23 @@ pub async fn get_paper_download_url(version_to_find: &str) -> Result<PaperDownlo
 
 }
 
-pub async fn get_version(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<String> {
+/// Retrieves the path to the specified server version's 'server.jar' file
+/// If the version is set to "recent," it fetches the version from the config file.
+///
+/// # Arguments
+/// - `version_to_find`: A reference to the version string to fetch the download link
+/// - `server_type`: The type of server for the requested version
+/// - `path`: The root directory of server installations
+/// # Returns
+/// A result containing the path as a String if successful
+pub async fn get_version(version_to_find: &str, server_type: &ServerType, path: &PathBuf) -> Result<String> {
     let mvm_dir = path;
     let config_path = mvm_dir.join("config.toml");
     if !config_path.exists() {
         return Err(anyhow!(format!("No version has been set! path: {:?}", config_path)));
     }
 
-    let version_to_get = if version == "recent" {
+    let version = if version_to_find == "recent" {
         let toml_content = fs::read_to_string(config_path)
             .await
             .context("Failed to read config.toml")?;
@@ -123,14 +166,14 @@ pub async fn get_version(version: &str, server_type: &ServerType, path: &PathBuf
             ServerType::Paper => version_config.paper
         }
     } else {
-        version.to_string()
+        version_to_find.to_string()
     };
 
     let server_type_dir = mvm_dir.join(server_type.to_string());
-    let version_path = server_type_dir.join("versions").join(&version_to_get).join("server.jar");
+    let version_path = server_type_dir.join("versions").join(&version).join("server.jar");
 
     if !version_path.exists() {
-        return Err(anyhow!("Version '{}' not found", &version_to_get));
+        return Err(anyhow!("Version '{}' not found", &version));
     }
 
     let path_str = version_path.to_str().ok_or_else(|| anyhow!("Invalid path"))?.to_string();
@@ -138,6 +181,17 @@ pub async fn get_version(version: &str, server_type: &ServerType, path: &PathBuf
     Ok(path_str)
 
 }
+
+
+///Fetches the download link for a specific vanilla Minecraft server given the version
+///
+/// If the version to find is "latest", it retrieves the most recent version automatically
+///
+///# Arguments
+/// - `file_url`: Represents the URL from where the JAR file should be downloaded from
+/// - `version`: A reference to the version of the minecraft server that it is downloading.
+/// - `server_type`: The type of server for the requested version
+/// - `path`: The root directory of server installations
 
 pub async fn download_server_jar(file_url: String, version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let response = reqwest::get(&file_url)
@@ -175,6 +229,14 @@ pub async fn download_server_jar(file_url: String, version: &str, server_type: &
     Ok(())
 }
 
+
+/// Deletes the server JAR for a specified Minecraft server version
+///
+/// # Arguments
+/// - `version`: A reference to the version of the minecraft server to delete
+/// - `server_type`: The type of server
+/// - `path`: The root directory of server installations
+
 pub async fn delete_server_jar(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
     let server_type_dir = mvm_dir.join(server_type.to_string());
@@ -193,6 +255,17 @@ pub async fn delete_server_jar(version: &str, server_type: &ServerType, path: &P
     Ok(())
 }
 
+/// Sets the specified version of the Minecraft server as the current version.
+/// If the version to find is "latest", it retrieves the most recent version automatically
+///
+/// # Arguments
+/// - `version`: A reference to the version of the minecraft server to be set
+/// - `server_type`: The type of server
+/// - `path`: The root directory of server installations
+///
+/// # Notes
+/// - If the server jar for the specified version does not exist, it is downloaded automatically.
+/// - Updates the `config.toml` file to the new current version.
 pub async fn use_version(version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let mvm_dir = path;
     let server_type_dir = mvm_dir.join(server_type.to_string());

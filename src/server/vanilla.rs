@@ -1,3 +1,5 @@
+//! This submodule provides structures and types for parsing JSON responses from Mojang's Minecraft version API.
+
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]

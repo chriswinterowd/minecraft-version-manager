@@ -1,3 +1,15 @@
+//! The main module for the Minecraft Version Manager
+//!
+//! This module serves as the entry point for the application. It defines the CLI interface
+//! using `clap` and handles subcommands for managing Minecraft server versions.
+//!
+//! Subcommands include:
+//! - `Use`: Activates a specified server version.
+//! - `Install`: Installs a specific or latest version of the server.
+//! - `Uninstall`: Removes a specific server version.
+//! - `Which`: Determines the path of a specific or recent server version.
+
+
 mod version_manager;
 mod config;
 mod server;
@@ -47,6 +59,12 @@ enum Commands {
         paper: bool
     }
 }
+
+/// The entry point of the application.
+///
+/// This function parses command-line arguments, processes subcommands,
+/// and coordinates operations like installing, uninstalling, and activating
+/// Minecraft server versions.
 
 
 #[tokio::main]
@@ -99,6 +117,14 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+
+/// Converts a boolean value to its corresponding server type string.
+///
+/// # Arguments
+/// - `paper`: A boolean flag indicating whether the server type is Paper.
+///
+/// # Returns
+/// A `String` representation of the server type, either `"paper"` or `"vanilla"`.
 
 fn bool_to_string(paper: bool) -> String {
     match paper {
