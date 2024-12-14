@@ -1,4 +1,4 @@
-//! This module handles version management for Minecraft servers.
+//! Handles version management for Minecraft servers.
 //! It provides utilities for retrieving and processing server versions.
 
 use crate::server::vanilla::{VanillaDownloadLink, Latest, VersionDownloads, VanillaVersions};

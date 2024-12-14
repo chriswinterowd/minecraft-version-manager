@@ -1,4 +1,4 @@
-//! This module provides functionality for retrieving the working directory of the Minecraft Version Manager
+//! Retrieves the working directory of the Minecraft Version Manager
 //!
 //! It first checks for the `MVM_HOME` environment variable to determine the directory.
 //! If the variable is not set or invalid, it defaults to using the user's home directory and appending `.mvm`.
