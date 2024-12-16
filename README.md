@@ -1,84 +1,90 @@
-# **Minecraft Version Manager**
+# mvm: Minecraft Version Manager
 
-**mvm** is a CLI tool for managing Minecraft server versions. It allows users to install, use, and remove Minecraft server versions (both Vanilla and Paper), as well as determine the paths for existing server installations.
-
----
-
-## **Features**
-- **Install**: Download and install a specific or the latest server version.
-- **Use**: Activate a specific version of a Minecraft server.
-- **Uninstall**: Remove a server version.
-- **Which**: Determine the path to a specific or recent server version.
-
-MVM supports **Vanilla** and **Paper** server types, automatically handling version downloads and configuration.
+**mvm** is a simple CLI-based Minecraft version manager that allows users to manage Vanilla and Paper Minecraft servers effortlessly. It supports downloading, using, and managing specific versions of servers through intuitive subcommands.
 
 ---
 
-## **Installation**
-
-### Prerequisites
-- **Rust**: Ensure you have Rust and Cargo installed.  
-  [Get Rust here](https://www.rust-lang.org/tools/install).
-
-### Build the Project
-Run the following command to build the binary:
-```bash
-cargo build --release
-```
-
-### Install the Binary
-Once built, the binary can be installed:
-```bash
-cargo install --path .
-```
+## Features
+- **Install** and **delete** Minecraft server versions (Vanilla or Paper).
+- **Activate** a specific version for use.
+- **Determine** the path of a specific or recent server version.
+- Defaults to **Vanilla** server management unless the `--paper` flag is provided for Paper servers.
 
 ---
 
-## **Usage**
+## Installation
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/chriswinterowd/minecraft-version-manager
+   cd minecraft-version-manager
+   ```
 
-### **Commands**
-Below are the supported subcommands:
+2. **Build the project:**
+   ```bash
+   cargo build --release
+   ```
 
-| Command               | Description                                   | Example                                  |
-|-----------------------|-----------------------------------------------|------------------------------------------|
-| `install`             | Installs a specific or latest server version. | `mvm install --paper`                    |
-| `use`                 | Activates a specified server version.         | `mvm use 1.20 --paper`                   |
-| `uninstall`           | Removes a specific server version.            | `mvm uninstall 1.20`                     |
-| `which`               | Determines the path of a server version.      | `mvm which --paper`                      |
+3. **Install the `mvm` binary globally:**
+   Use a symlink to make the `mvm` executable available system-wide:
+   ```bash
+   sudo ln -s $(pwd)/target/release/mvm /usr/local/bin/mvm
+   ```
 
-### **Global Flags**
-- `--paper`: Specifies that the server type is Paper (defaults to Vanilla if omitted).
-
----
-
-## **Examples**
-
-### 1. **Install the Latest Paper Server**
-```bash
-mvm install --paper
-```
-
-### 2. **Activate a Vanilla Server Version**
-```bash
-mvm use 1.20.1
-```
-
-### 3. **Determine the Path for a Recent Server**
-```bash
-mvm which --paper
-```
-
-### 4. **Uninstall a Server Version**
-```bash
-mvm uninstall 1.20
-```
+4. **Verify the installation:**
+   ```bash
+   mvm --help
+   ```
+   This should display the CLI help message, confirming that `mvm` is installed correctly.
 
 ---
 
-## **Configuration**
-MVM uses a configuration file `config.toml` stored in the `.mvm` directory under the home folder. It keeps track of the most recently used server versions.
+### Subcommands
+| Command            | Description                                | 
+|--------------------|--------------------------------------------|
+| `install`          | Installs a specific or latest server.      | 
+| `use`              | Activates a specified server version.      | 
+| `uninstall`        | Removes a specific server version.         |
+| `which`            | Determines the path of a specified version.|
+
+### Flags
+- `--paper` : Specifies that you want to manage **Paper** servers. If this flag is **not provided**, **Vanilla** servers are managed by default.
 
 ---
 
-## **License**
-This project is licensed under the MIT License.
+## Examples
+
+1. **Install the latest Vanilla version:**
+   ```bash
+   mvm install
+   ```
+
+2. **Install the latest Paper version:**
+   ```bash
+   mvm install --paper
+   ```
+
+3. **Activate a specific Vanilla version:**
+   ```bash
+   mvm use 1.20.2
+   ```
+
+4. **Activate a specific Paper version:**
+   ```bash
+   mvm use 1.20.2 --paper
+   ```
+
+5. **Uninstall a specific Paper version:**
+   ```bash
+   mvm uninstall 1.20.2 --paper
+   ```
+
+6. **Find the path of the latest installed Vanilla version:**
+   ```bash
+   mvm which
+   ```
+
+---
+
+---
+
+
