@@ -84,7 +84,10 @@
    ```
 
 ---
+---
 
+## License
+[**LICENSE.md**](https://github.com/chriswinterowd/minecraft-version-manager/blob/master/LICENSE.md)
 ---
 
 
