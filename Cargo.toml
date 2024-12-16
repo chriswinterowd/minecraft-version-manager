@@ -1,7 +1,16 @@
 [package]
-name = "minecraft_version_manager"
+name = "mvm"
 version = "0.1.0"
 edition = "2021"
+authors = ["Chris Winterowd <github:chriswinterowd>"]
+description = "A Minecraft Version Manager for Vanilla and Paper servers."
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/chriswinterowd/minecraft-version-manager"
+homepage = "https://github.com/chriswinterowd/minecraft-version-manager"
+keywords = ["minecraft", "server", "version", "manager", "tool"]
+categories = ["command-line-utilities"]
+documentation = "https://docs.rs/mvm"
 
 [dependencies]
 clap = { version = "4.5.21", features = ["derive"] }

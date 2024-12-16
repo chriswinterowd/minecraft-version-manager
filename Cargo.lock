@@ -748,23 +748,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
-name = "minecraft_version_manager"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "dirs",
- "futures-util",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "toml",
- "url",
-]
-
-[[package]]
 name = "miniz_oxide"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -782,6 +765,23 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "mvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dirs",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml",
+ "url",
 ]
 
 [[package]]
