@@ -193,10 +193,18 @@ pub async fn get_version(version_to_find: &str, server_type: &ServerType, path: 
 /// - `server_type`: The type of server for the requested version
 /// - `path`: The root directory of server installations
 
-pub async fn download_server_jar(file_url: String, version: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
+pub async fn download_server_jar(file_url: String, version_to_download: &str, server_type: &ServerType, path: &PathBuf) -> Result<()> {
     let response = reqwest::get(&file_url)
         .await
         .context(format!("Failed to send request to download server jar! Download link: {}", &file_url))?;
+
+    let version = if version_to_download == "latest" {
+        let latest_version = get_latest_paper_version()
+            .await?;
+        latest_version
+    } else {
+        version_to_download.to_string()
+    };
 
     let mvm_dir = path;
 
