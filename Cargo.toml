@@ -19,3 +19,7 @@ url = "2.5.4"
 [[bin]]
 name = "mvm"
 path = "src/main.rs"
+
+[lib]
+name = "mvm"
+path = "src/lib.rs"
